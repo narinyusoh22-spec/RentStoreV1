@@ -81,15 +81,41 @@ qs('#sendResetBtn').addEventListener('click', async () => {
   const btn = qs('#sendResetBtn');
   const email = qs('#forgotEmail').value.trim();
   const msg = qs('#forgotMsg');
-  if (!email) return;
+
+  if (!email) {
+    msg.innerHTML = `<div class="alert alert-warning">กรุณากรอกอีเมลก่อน</div>`;
+    return;
+  }
 
   btn.disabled = true;
+  btn.textContent = 'กำลังส่ง...';
+
   try {
     await requestPasswordReset(email);
     msg.innerHTML = `<div class="alert alert-success">ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย (รวมถึงโฟลเดอร์ Junk/Spam)</div>`;
+    btn.textContent = 'ส่งแล้ว ✓';
+    // auto-close the modal shortly after a successful send
+    setTimeout(() => {
+      const modalEl = qs('#forgotModal');
+      const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      instance.hide();
+    }, 2200);
   } catch (err) {
-    msg.innerHTML = `<div class="alert alert-danger">ส่งไม่สำเร็จ: ${err.message}</div>`;
-  } finally {
+    const friendly = err.message?.toLowerCase().includes('security purposes')
+      ? 'คุณเพิ่งขอลิงก์รีเซ็ตไปเมื่อสักครู่ กรุณารอสักครู่แล้วลองใหม่อีกครั้ง'
+      : err.message;
+    msg.innerHTML = `<div class="alert alert-danger">ส่งไม่สำเร็จ: ${friendly}</div>`;
     btn.disabled = false;
+    btn.textContent = 'ส่งลิงก์รีเซ็ต';
   }
+});
+
+// reset the modal back to a clean state every time it closes (whether by
+// auto-close on success, the cancel button, or the X button)
+qs('#forgotModal').addEventListener('hidden.bs.modal', () => {
+  qs('#forgotEmail').value = '';
+  qs('#forgotMsg').innerHTML = '';
+  const btn = qs('#sendResetBtn');
+  btn.disabled = false;
+  btn.textContent = 'ส่งลิงก์รีเซ็ต';
 });
