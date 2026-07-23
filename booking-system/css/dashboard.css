@@ -1,0 +1,110 @@
+/* =========================================================
+   Dashboard-specific styles (seller + customer)
+   Layout (grid/tabs/tables) now comes from Bootstrap 5;
+   this file only covers the bespoke pieces Bootstrap has no
+   ready-made component for.
+   ========================================================= */
+
+.dash-header { padding: 36px 0 8px; animation: fadeInUp 0.5s var(--ease-spring) both; }
+.dash-header .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--bs-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* nav-pills get a livelier active state to match the rest of the theme */
+.nav-pills .nav-link {
+  color: var(--ink-soft);
+  font-weight: 600;
+  border-radius: 999px;
+  position: relative;
+}
+.nav-pills .nav-link:hover:not(.active) { background: var(--surface-2); color: var(--primary-dark); }
+.nav-pills .nav-link.active {
+  background: var(--gradient-primary) !important;
+  box-shadow: 0 4px 14px rgba(31, 75, 67, 0.25);
+}
+
+/* stat cards */
+.stat-card {
+  background: #fff;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  padding: 20px;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  animation: fadeInUp 0.5s var(--ease-spring) both;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--gradient-accent);
+}
+.stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+.stat-card .stat-label { font-size: 0.78rem; color: var(--ink-soft); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.03em; }
+.stat-card .stat-value {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin-top: 6px;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.stat-card .stat-sub { font-size: 0.8rem; color: var(--ink-faint); margin-top: 4px; }
+
+#statGrid > .col:nth-child(1) .stat-card { animation-delay: 0.03s; }
+#statGrid > .col:nth-child(2) .stat-card { animation-delay: 0.08s; }
+#statGrid > .col:nth-child(3) .stat-card { animation-delay: 0.13s; }
+#statGrid > .col:nth-child(4) .stat-card { animation-delay: 0.18s; }
+
+/* image upload dropzone */
+.image-upload {
+  border: 1.5px dashed var(--bs-border-color);
+  border-radius: var(--bs-border-radius-lg);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--ink-faint);
+  background: var(--surface-2) center/cover no-repeat;
+  font-size: 0.82rem;
+  text-align: center;
+  overflow: hidden;
+  position: relative;
+}
+.image-upload:hover { border-color: var(--bs-warning); background-color: #FBF3E4; }
+.image-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.image-upload.has-image { color: transparent; }
+.image-upload.has-image:hover { border-color: rgba(255,255,255,0.6); }
+
+/* service list */
+.service-row-list { display: flex; flex-direction: column; gap: 12px; }
+.service-row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  background: #fff;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  animation: fadeInUp 0.4s var(--ease-spring) both;
+}
+.service-row:hover { box-shadow: var(--shadow-sm); border-color: rgba(31, 75, 67, 0.2); transform: translateX(3px); }
+.service-row-img {
+  width: 64px; height: 64px;
+  border-radius: 10px;
+  background: var(--surface-2) center/cover no-repeat;
+}
+.service-row-name { font-weight: 600; color: var(--ink); }
+.service-row-meta { font-size: 0.82rem; color: var(--ink-soft); font-family: var(--font-mono); }
