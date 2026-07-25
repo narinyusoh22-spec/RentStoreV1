@@ -83,13 +83,15 @@ async function loadShops() {
   });
 
   grid.innerHTML = shops
-    .map((s) => {
+    .map((s, i) => {
       const list = ratingByShop[s.id] || [];
       const avg = list.length ? (list.reduce((a, b) => a + b, 0) / list.length).toFixed(1) : null;
       const img = s.cover_url ? `style="background-image:url('${s.cover_url}')"` : '';
+      // small stagger so cards revealed together don't all pop in at once
+      const delay = (i % 6) * 0.06;
       return `
       <div class="col">
-        <a class="shop-card" href="shop.html?id=${s.id}">
+        <a class="shop-card" href="shop.html?id=${s.id}" style="--reveal-delay:${delay}s">
           <div class="shop-card-img" ${img}>${s.cover_url ? '' : s.name.slice(0, 1)}</div>
           <div class="shop-card-body">
             <span class="shop-card-cat">${s.category}</span>
@@ -103,6 +105,30 @@ async function loadShops() {
       </div>`;
     })
     .join('');
+
+  observeCardReveal();
+}
+
+// reveals each shop-card with a fade/slide-up transition as it scrolls into
+// view, instead of animating everything at once on page load
+function observeCardReveal() {
+  const cards = document.querySelectorAll('#shopGrid .shop-card');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach((c) => c.classList.add('in-view'));
+    return;
+  }
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.15, rootMargin: '0px 0px -40px 0px' }
+  );
+  cards.forEach((c) => observer.observe(c));
 }
 
 qs('#searchForm').addEventListener('submit', (e) => {
