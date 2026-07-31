@@ -68,6 +68,18 @@ create table if not exists public.reviews (
   unique (booking_id)
 );
 
+-- ---------- 6) NOTIFICATIONS (แจ้งเตือนในแอป) ----------
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  booking_id uuid references public.bookings (id) on delete cascade,
+  message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_notifications_user on public.notifications (user_id, is_read);
+
 create index if not exists idx_shops_owner on public.shops (owner_id);
 create index if not exists idx_services_shop on public.services (shop_id);
 create index if not exists idx_bookings_shop on public.bookings (shop_id);
@@ -104,6 +116,50 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 -- =========================================================
+--  TRIGGER: สร้างการแจ้งเตือนในแอปอัตโนมัติ เมื่อสถานะการจองเปลี่ยน
+-- =========================================================
+create or replace function public.notify_booking_status_change()
+returns trigger as $$
+declare
+  shop_name text;
+  service_name text;
+  status_text text;
+begin
+  if new.status = old.status then
+    return new;
+  end if;
+
+  status_text := case new.status
+    when 'confirmed' then 'ร้านยืนยันการจองของคุณแล้ว'
+    when 'completed' then 'การจองของคุณเสร็จสิ้นแล้ว ให้คะแนนร้านได้เลย'
+    when 'cancelled' then 'การจองของคุณถูกยกเลิก'
+    else null
+  end;
+
+  if status_text is null then
+    return new;
+  end if;
+
+  select name into shop_name from public.shops where id = new.shop_id;
+  select name into service_name from public.services where id = new.service_id;
+
+  insert into public.notifications (user_id, booking_id, message)
+  values (
+    new.customer_id,
+    new.id,
+    status_text || ' — ' || coalesce(shop_name, 'ร้านค้า') || ' (' || coalesce(service_name, 'บริการ') || ')'
+  );
+
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists on_booking_status_change on public.bookings;
+create trigger on_booking_status_change
+  after update on public.bookings
+  for each row execute procedure public.notify_booking_status_change();
+
+-- =========================================================
 --  ROW LEVEL SECURITY
 -- =========================================================
 alter table public.profiles enable row level security;
@@ -111,6 +167,7 @@ alter table public.shops enable row level security;
 alter table public.services enable row level security;
 alter table public.bookings enable row level security;
 alter table public.reviews enable row level security;
+alter table public.notifications enable row level security;
 
 -- ---- profiles ----
 drop policy if exists "profiles_select_all" on public.profiles;
@@ -198,6 +255,16 @@ create policy "reviews_insert_customer" on public.reviews
     )
   );
 
+-- ---- notifications ----
+-- ไม่มี insert policy ให้ผู้ใช้ทั่วไป เพราะแถวถูกสร้างผ่าน trigger (security definer) เท่านั้น
+drop policy if exists "notifications_select_own" on public.notifications;
+create policy "notifications_select_own" on public.notifications
+  for select using (user_id = auth.uid());
+
+drop policy if exists "notifications_update_own" on public.notifications;
+create policy "notifications_update_own" on public.notifications
+  for update using (user_id = auth.uid());
+
 -- =========================================================
 --  STORAGE: bucket สำหรับรูปภาพร้าน/บริการ
 --  ไปสร้าง bucket ชื่อ "shop-media" (Public bucket) ที่หน้า Storage ก่อน
@@ -218,5 +285,12 @@ create policy "shop_media_auth_update" on storage.objects
 drop policy if exists "shop_media_auth_delete" on storage.objects;
 create policy "shop_media_auth_delete" on storage.objects
   for delete using (bucket_id = 'shop-media' and auth.role() = 'authenticated');
+
+-- บังคับขนาดไฟล์และชนิดไฟล์ที่ระดับ bucket จริงๆ (ฝั่งเซิร์ฟเวอร์)
+-- ต้องรันหลังจากสร้าง bucket "shop-media" แล้วเท่านั้น ไม่งั้นจะไม่มีผลอะไร (0 rows updated)
+update storage.buckets
+set file_size_limit = 5242880, -- 5MB เป็นไบต์
+    allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+where id = 'shop-media';
 
 -- เสร็จแล้ว! ระบบพร้อมใช้งาน
