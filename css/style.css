@@ -38,6 +38,7 @@
   --primary-light: #2F6E61;
   --accent-dark: #C77F1E;
   --coral: #D97757;
+  --surface: #FFFFFF;
   --surface-2: #F0EEE5;
   --font-display: 'Taviraj', serif;
   --font-mono: 'IBM Plex Mono', monospace;
@@ -68,8 +69,9 @@ h1, h2, h3, h4, h5 {
   font-family: var(--font-display);
   font-weight: 600;
   color: var(--primary-dark);
+  letter-spacing: -0.01em;
 }
-h1 { font-weight: 700; }
+h1 { font-weight: 700; letter-spacing: -0.02em; }
 
 .mono, .font-mono { font-family: var(--font-mono); }
 
@@ -344,7 +346,8 @@ a, button, .btn, .chip, .shop-card, .ticket, .stat-card, .service-item,
 #categoryChips .cat-chip:nth-child(8) { animation-delay: 0.48s; }
 
 /* ---------- Buttons (Bootstrap overrides for extra polish) ---------- */
-.btn { font-weight: 600; letter-spacing: 0.01em; }
+.btn { font-weight: 600; letter-spacing: 0.01em; border-radius: 999px; }
+.btn-sm { border-radius: 999px; }
 .btn:active { transform: scale(0.97); }
 .btn-primary {
   background: var(--gradient-primary);
@@ -373,6 +376,8 @@ a, button, .btn, .chip, .shop-card, .ticket, .stat-card, .service-item,
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
+.theme-toggle i { display: inline-block; transition: transform 0.4s var(--ease-spring); }
+.theme-toggle:active i { transform: rotate(25deg) scale(0.85); }
 
 /* ---------- Shop grid card ---------- */
 .shop-card {
@@ -674,3 +679,80 @@ a, button, .btn, .chip, .shop-card, .ticket, .stat-card, .service-item,
 }
 .cta-banner h3 { color: #fff; }
 .cta-banner p { color: rgba(255,255,255,0.8); }
+
+/* =========================================================
+   Dark mode — toggled via data-bs-theme="dark" on <html>
+   (set by js/auth.js, persisted in localStorage)
+   ========================================================= */
+[data-bs-theme="dark"] {
+  --bs-body-bg: #141F1B;
+  --bs-body-color: #E8E6DD;
+  --bs-border-color: #28382F;
+  --bs-card-bg: #1B2621;
+  --bs-card-border-color: #28382F;
+  --bs-modal-bg: #1B2621;
+  --bs-dropdown-bg: #1B2621;
+  --bs-dropdown-link-color: #E8E6DD;
+  --bs-dropdown-link-hover-bg: #243128;
+  --surface: #1B2621;
+  --surface-2: #202D27;
+  --ink: #E8E6DD;
+  --ink-soft: #A7B0A9;
+  --ink-faint: #6E786F;
+  --primary-dark: #8FCBB9;
+  --primary-light: #4A8E7D;
+  --gradient-primary: linear-gradient(135deg, #2F6E61 0%, #3F8A76 100%);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+[data-bs-theme="dark"] body { background: var(--bs-body-bg); }
+[data-bs-theme="dark"] .site-navbar { background: rgba(20, 31, 27, 0.85); }
+[data-bs-theme="dark"] .shop-card,
+[data-bs-theme="dark"] .ticket,
+[data-bs-theme="dark"] .service-item,
+[data-bs-theme="dark"] .review-card,
+[data-bs-theme="dark"] .slot-btn,
+[data-bs-theme="dark"] .card {
+  background: var(--surface);
+  border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] .shop-card-img,
+[data-bs-theme="dark"] .service-item-img,
+[data-bs-theme="dark"] .ticket-stub,
+[data-bs-theme="dark"] .image-upload {
+  background-color: var(--surface-2);
+}
+[data-bs-theme="dark"] .ticket-stub::before,
+[data-bs-theme="dark"] .ticket-stub::after {
+  background: var(--bs-body-bg);
+}
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select,
+[data-bs-theme="dark"] .search-bar .form-control {
+  background-color: var(--surface);
+  border-color: var(--bs-border-color);
+  color: var(--ink);
+}
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+  background-color: var(--surface);
+  color: var(--ink);
+}
+[data-bs-theme="dark"] .role-tag,
+[data-bs-theme="dark"] .role-option {
+  background: var(--surface-2);
+}
+[data-bs-theme="dark"] .hero::before {
+  background: radial-gradient(circle, rgba(232, 163, 61, 0.14), transparent 70%);
+}
+[data-bs-theme="dark"] .hero::after {
+  background: radial-gradient(circle, rgba(143, 203, 185, 0.14), transparent 70%);
+}
+[data-bs-theme="dark"] .cat-chip-icon,
+[data-bs-theme="dark"] .chip {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-bs-theme="dark"] .cat-chip-label { color: var(--ink-soft); }
+[data-bs-theme="dark"] .notif-item.unread { background: var(--surface-2); }
