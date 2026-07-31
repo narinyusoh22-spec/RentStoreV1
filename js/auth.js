@@ -1,6 +1,11 @@
 import { supabase, qs } from './supabase-client.js';
 import { renderNotificationBell } from './notifications.js';
 
+// apply saved theme as early as possible (module code runs immediately on
+// import, before renderNav's async work) to minimize a flash of light mode
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark') document.documentElement.setAttribute('data-bs-theme', 'dark');
+
 // ---------- auth actions ----------
 
 export async function signUp({ email, password, fullName, phone, role }) {
@@ -82,9 +87,12 @@ export async function renderNav() {
   if (!mount) return;
 
   const { session, profile } = await getSessionAndProfile();
+  const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  const themeToggleHtml = `<button class="btn btn-outline-secondary btn-sm theme-toggle" id="themeToggle" type="button" title="สลับโหมดมืด/สว่าง"><i class="bi ${isDark ? 'bi-sun' : 'bi-moon-stars'}"></i></button>`;
 
   if (!session) {
-    mount.innerHTML = `<a class="btn btn-outline-primary btn-sm" href="login.html">เข้าสู่ระบบ</a>`;
+    mount.innerHTML = `${themeToggleHtml}<a class="btn btn-outline-primary btn-sm" href="login.html">เข้าสู่ระบบ</a>`;
+    setupThemeToggle();
     return;
   }
 
@@ -92,6 +100,7 @@ export async function renderNav() {
   const roleText = profile?.role === 'seller' ? 'ผู้ขาย' : 'ลูกค้า';
 
   mount.innerHTML = `
+    ${themeToggleHtml}
     <div class="d-flex align-items-center gap-2 small">
       <strong>${profile?.full_name || 'ผู้ใช้'}</strong> <span class="role-tag">${roleText}</span>
     </div>
@@ -101,8 +110,25 @@ export async function renderNav() {
   `;
 
   qs('#btnLogout', mount).addEventListener('click', signOut);
+  setupThemeToggle();
 
   if (profile?.role === 'customer') {
     renderNotificationBell(mount, session);
   }
+}
+
+function setupThemeToggle() {
+  const btn = qs('#themeToggle');
+  if (!btn) return;
+  const icon = btn.querySelector('i');
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+    if (next === 'dark') {
+      document.documentElement.setAttribute('data-bs-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-bs-theme');
+    }
+    localStorage.setItem('theme', next);
+    icon.className = next === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
+  });
 }
