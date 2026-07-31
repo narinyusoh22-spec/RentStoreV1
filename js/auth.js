@@ -1,4 +1,5 @@
 import { supabase, qs } from './supabase-client.js';
+import { renderNotificationBell } from './notifications.js';
 
 // ---------- auth actions ----------
 
@@ -100,4 +101,8 @@ export async function renderNav() {
   `;
 
   qs('#btnLogout', mount).addEventListener('click', signOut);
+
+  if (profile?.role === 'customer') {
+    renderNotificationBell(mount, session);
+  }
 }
