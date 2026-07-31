@@ -108,3 +108,12 @@
 }
 .service-row-name { font-weight: 600; color: var(--ink); }
 .service-row-meta { font-size: 0.82rem; color: var(--ink-soft); font-family: var(--font-mono); }
+
+/* dark mode overrides for dashboard-only components */
+[data-bs-theme="dark"] .stat-card,
+[data-bs-theme="dark"] .service-row {
+  background: var(--surface);
+  border-color: var(--bs-border-color);
+}
+[data-bs-theme="dark"] .service-row-img { background-color: var(--surface-2); }
+[data-bs-theme="dark"] .image-upload:hover { background-color: #24352C; }
