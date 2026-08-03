@@ -292,13 +292,22 @@ function renderBookings() {
     return;
   }
 
+  // count completed visits per customer at this shop, for the "ลูกค้าประจำ" badge
+  const completedCountByCustomer = {};
+  bookings.forEach((b) => {
+    if (b.status === 'completed') {
+      completedCountByCustomer[b.customer_id] = (completedCountByCustomer[b.customer_id] || 0) + 1;
+    }
+  });
+
   body.innerHTML = list
-    .map(
-      (b) => `
+    .map((b) => {
+      const isRegular = (completedCountByCustomer[b.customer_id] || 0) >= 2;
+      return `
       <tr>
         <td>${formatDateThai(b.booking_date).full}<br><span class="mono small text-secondary">${formatTime(b.booking_time)} น.</span></td>
         <td>${b.services?.name || ''}<br><span class="small text-secondary">฿${formatMoney(b.services?.price)}</span></td>
-        <td>${b.profiles?.full_name || ''}<br><span class="small text-secondary">${b.profiles?.phone || ''}</span></td>
+        <td>${b.profiles?.full_name || ''} ${isRegular ? '<span class="badge regular-badge"><i class="bi bi-award-fill"></i> ลูกค้าประจำ</span>' : ''}<br><span class="small text-secondary">${b.profiles?.phone || ''}</span></td>
         <td><span class="badge badge-${b.status}">${statusLabel(b.status)}</span></td>
         <td>
           <div class="d-flex gap-2 flex-wrap">
@@ -306,8 +315,8 @@ function renderBookings() {
             ${b.status === 'confirmed' ? `<button class="btn btn-primary btn-sm" data-set="${b.id}:completed">เสร็จสิ้น</button><button class="btn btn-outline-danger btn-sm" data-set="${b.id}:cancelled">ยกเลิก</button>` : ''}
           </div>
         </td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join('');
 
   qsa('[data-set]').forEach((btn) => {

@@ -1,18 +1,40 @@
 import { supabase, qs, qsa, formatDateThai, formatTime, formatMoney, statusLabel } from './supabase-client.js';
 import { requireRole, renderNav } from './auth.js';
+import { listFavoriteShops, removeFavorite } from './favorites.js';
 
 renderNav();
 
-let session, bookings = [], reviewedBookingIds = new Set();
+let session, profile, bookings = [], reviewedBookingIds = new Set();
 let reviewModal, currentBookingId = null, currentShopId = null, currentRating = 5;
 
 (async () => {
   const auth = await requireRole('customer');
   if (!auth) return;
   session = auth.session;
+  profile = auth.profile;
   reviewModal = new bootstrap.Modal(qs('#reviewModal'));
+  renderLoyaltyBanner();
   await load();
+  await loadFavorites();
 })();
+
+function renderLoyaltyBanner() {
+  const points = profile?.loyalty_points || 0;
+  const count = profile?.completed_bookings_count || 0;
+  let tier = { label: 'ลูกค้าใหม่', icon: 'bi-person', className: 'tier-new' };
+  if (points >= 150) tier = { label: 'ลูกค้า VIP', icon: 'bi-gem', className: 'tier-vip' };
+  else if (points >= 50) tier = { label: 'ลูกค้าประจำ', icon: 'bi-award', className: 'tier-regular' };
+
+  qs('#loyaltyBanner').innerHTML = `
+    <div class="loyalty-card ${tier.className}">
+      <div class="loyalty-icon"><i class="bi ${tier.icon}"></i></div>
+      <div>
+        <div class="loyalty-tier">${tier.label}</div>
+        <div class="loyalty-sub">${points} แต้มสะสม · ใช้บริการสำเร็จ ${count} ครั้ง</div>
+      </div>
+    </div>
+  `;
+}
 
 async function load() {
   const { data, error } = await supabase
@@ -58,6 +80,10 @@ function ticketHtml(b, isUpcoming) {
   const d = formatDateThai(b.booking_date);
   const canCancel = isUpcoming;
   const canReview = b.status === 'completed' && !reviewedBookingIds.has(b.id);
+  const showQr = b.status === 'confirmed';
+  const checkinUrl = `${window.location.origin}/checkin.html?booking=${b.id}`;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=4&data=${encodeURIComponent(checkinUrl)}`;
+
   return `
     <div class="ticket">
       <div class="ticket-main">
@@ -68,6 +94,7 @@ function ticketHtml(b, isUpcoming) {
           <span class="badge badge-${b.status}">${statusLabel(b.status)}</span>
         </div>
         ${b.note ? `<p class="small mt-2 mb-0">หมายเหตุ: ${b.note}</p>` : ''}
+        ${showQr ? `<div class="ticket-qr"><img src="${qrSrc}" alt="QR เช็คอิน" width="80" height="80" /><span>โชว์ QR นี้ให้ร้านสแกนตอนถึงคิว</span></div>` : ''}
         <div class="ticket-actions">
           ${canCancel ? `<button class="btn btn-outline-danger btn-sm" data-cancel="${b.id}">ยกเลิกการจอง</button>` : ''}
           ${canReview ? `<button class="btn btn-warning btn-sm" data-review="${b.id}" data-shop="${b.shop_id}">ให้คะแนนร้าน</button>` : ''}
@@ -140,3 +167,44 @@ qs('#submitReview').addEventListener('click', async () => {
   reviewModal.hide();
   await load();
 });
+
+async function loadFavorites() {
+  try {
+    const shops = await listFavoriteShops(session.user.id);
+    const list = qs('#favoritesList');
+    list.innerHTML = shops.length
+      ? `<div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">${shops.map(favoriteCardHtml).join('')}</div>`
+      : `<div class="empty-state"><div class="icon">🤍</div>ยังไม่มีร้านโปรด กดรูปหัวใจที่การ์ดร้านเพื่อบันทึกไว้<br><a class="btn btn-primary mt-3" href="index.html">ไปค้นหาร้าน</a></div>`;
+
+    qsa('[data-unfav]').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        btn.disabled = true;
+        await removeFavorite(session.user.id, btn.dataset.unfav);
+        await loadFavorites();
+      });
+    });
+  } catch (err) {
+    qs('#favoritesList').innerHTML = `<div class="empty-state">โหลดร้านโปรดไม่สำเร็จ: ${err.message}</div>`;
+  }
+}
+
+function favoriteCardHtml(s) {
+  const img = s.cover_url ? `style="background-image:url('${s.cover_url}')"` : '';
+  return `
+    <div class="col">
+      <a class="shop-card in-view" href="shop.html?id=${s.id}">
+        <div class="shop-card-img" ${img}>
+          ${s.cover_url ? '' : s.name.slice(0, 1)}
+          <button type="button" class="fav-btn active" data-unfav="${s.id}" aria-label="เอาออกจากร้านโปรด"><i class="bi bi-heart-fill"></i></button>
+          ${!s.is_active ? '<span class="urgency-badge" style="background:rgba(91,102,115,0.85);">ปิดรับจองชั่วคราว</span>' : ''}
+        </div>
+        <div class="shop-card-body">
+          <span class="shop-card-cat">${s.category}</span>
+          <span class="shop-card-name">${s.name}</span>
+          <p class="small text-secondary mb-0">${s.address || ''}</p>
+        </div>
+      </a>
+    </div>`;
+}

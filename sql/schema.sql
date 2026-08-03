@@ -80,6 +80,36 @@ create table if not exists public.notifications (
 
 create index if not exists idx_notifications_user on public.notifications (user_id, is_read);
 
+-- ---------- 7) FAVORITES (ร้านโปรดของลูกค้า) ----------
+create table if not exists public.favorites (
+  id uuid primary key default gen_random_uuid(),
+  customer_id uuid not null references public.profiles (id) on delete cascade,
+  shop_id uuid not null references public.shops (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (customer_id, shop_id)
+);
+
+create index if not exists idx_favorites_customer on public.favorites (customer_id);
+
+-- ---------- 8) WAITLIST (แจ้งเตือนเมื่อคิวว่างในวันที่ต้องการ) ----------
+create table if not exists public.waitlist (
+  id uuid primary key default gen_random_uuid(),
+  shop_id uuid not null references public.shops (id) on delete cascade,
+  service_id uuid not null references public.services (id) on delete cascade,
+  customer_id uuid not null references public.profiles (id) on delete cascade,
+  preferred_date date not null,
+  note text,
+  status text not null default 'waiting' check (status in ('waiting', 'notified', 'cancelled')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_waitlist_shop_date on public.waitlist (shop_id, preferred_date, status);
+create index if not exists idx_waitlist_customer on public.waitlist (customer_id);
+
+-- เพิ่มคอลัมน์แต้มสะสม/จำนวนครั้งที่ใช้บริการสำเร็จ ให้ profiles (สำหรับระบบลูกค้าประจำ)
+alter table public.profiles add column if not exists loyalty_points integer not null default 0;
+alter table public.profiles add column if not exists completed_bookings_count integer not null default 0;
+
 create index if not exists idx_shops_owner on public.shops (owner_id);
 create index if not exists idx_services_shop on public.services (shop_id);
 create index if not exists idx_bookings_shop on public.bookings (shop_id);
@@ -116,7 +146,8 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 -- =========================================================
---  TRIGGER: สร้างการแจ้งเตือนในแอปอัตโนมัติ เมื่อสถานะการจองเปลี่ยน
+--  TRIGGER: เมื่อสถานะการจองเปลี่ยน — แจ้งเตือนลูกค้า, ให้แต้มสะสมถ้าเสร็จสิ้น,
+--  และแจ้งคิวรอ (waitlist) ถ้ามีคิวว่างจากการยกเลิก
 -- =========================================================
 create or replace function public.notify_booking_status_change()
 returns trigger as $$
@@ -124,6 +155,7 @@ declare
   shop_name text;
   service_name text;
   status_text text;
+  wl record;
 begin
   if new.status = old.status then
     return new;
@@ -136,19 +168,43 @@ begin
     else null
   end;
 
-  if status_text is null then
-    return new;
-  end if;
-
   select name into shop_name from public.shops where id = new.shop_id;
   select name into service_name from public.services where id = new.service_id;
 
-  insert into public.notifications (user_id, booking_id, message)
-  values (
-    new.customer_id,
-    new.id,
-    status_text || ' — ' || coalesce(shop_name, 'ร้านค้า') || ' (' || coalesce(service_name, 'บริการ') || ')'
-  );
+  if status_text is not null then
+    insert into public.notifications (user_id, booking_id, message)
+    values (
+      new.customer_id,
+      new.id,
+      status_text || ' — ' || coalesce(shop_name, 'ร้านค้า') || ' (' || coalesce(service_name, 'บริการ') || ')'
+    );
+  end if;
+
+  -- ให้แต้มสะสม + นับจำนวนครั้งที่ใช้บริการสำเร็จ (ระบบลูกค้าประจำ)
+  if new.status = 'completed' then
+    update public.profiles
+    set loyalty_points = loyalty_points + 10,
+        completed_bookings_count = completed_bookings_count + 1
+    where id = new.customer_id;
+  end if;
+
+  -- ถ้ายกเลิก แปลว่าอาจมีคิวว่างขึ้นมา แจ้งลูกค้าที่ลงชื่อรอคิว (waitlist) วันเดียวกัน ร้านเดียวกัน
+  if new.status = 'cancelled' then
+    for wl in
+      select * from public.waitlist
+      where shop_id = new.shop_id
+        and preferred_date = new.booking_date
+        and status = 'waiting'
+    loop
+      insert into public.notifications (user_id, booking_id, message)
+      values (
+        wl.customer_id,
+        new.id,
+        'มีคิวว่างแล้วที่ ' || coalesce(shop_name, 'ร้านค้า') || ' วันที่คุณรออยู่ รีบเข้าไปจองก่อนที่นั่งจะเต็มอีกครั้ง'
+      );
+      update public.waitlist set status = 'notified' where id = wl.id;
+    end loop;
+  end if;
 
   return new;
 end;
@@ -264,6 +320,39 @@ create policy "notifications_select_own" on public.notifications
 drop policy if exists "notifications_update_own" on public.notifications;
 create policy "notifications_update_own" on public.notifications
   for update using (user_id = auth.uid());
+
+-- ---- favorites ----
+alter table public.favorites enable row level security;
+
+drop policy if exists "favorites_select_own" on public.favorites;
+create policy "favorites_select_own" on public.favorites
+  for select using (customer_id = auth.uid());
+
+drop policy if exists "favorites_insert_own" on public.favorites;
+create policy "favorites_insert_own" on public.favorites
+  for insert with check (customer_id = auth.uid());
+
+drop policy if exists "favorites_delete_own" on public.favorites;
+create policy "favorites_delete_own" on public.favorites
+  for delete using (customer_id = auth.uid());
+
+-- ---- waitlist ----
+alter table public.waitlist enable row level security;
+
+drop policy if exists "waitlist_select_involved" on public.waitlist;
+create policy "waitlist_select_involved" on public.waitlist
+  for select using (
+    customer_id = auth.uid()
+    or exists (select 1 from public.shops s where s.id = shop_id and s.owner_id = auth.uid())
+  );
+
+drop policy if exists "waitlist_insert_own" on public.waitlist;
+create policy "waitlist_insert_own" on public.waitlist
+  for insert with check (customer_id = auth.uid());
+
+drop policy if exists "waitlist_update_own" on public.waitlist;
+create policy "waitlist_update_own" on public.waitlist
+  for update using (customer_id = auth.uid());
 
 -- =========================================================
 --  STORAGE: bucket สำหรับรูปภาพร้าน/บริการ

@@ -1,5 +1,6 @@
 import { supabase, qs, formatMoney, starString } from './supabase-client.js';
 import { getSessionAndProfile, renderNav } from './auth.js';
+import { isFavorite, toggleFavorite } from './favorites.js';
 
 renderNav();
 
@@ -15,6 +16,7 @@ if (!shopId) {
 let shop, services, reviews, session, profile;
 let selectedServiceId = null;
 let selectedTime = null;
+let isFav = false;
 
 async function load() {
   const [{ data: shopData, error: shopErr }, { data: serviceData }, { data: reviewData }, sess] = await Promise.all([
@@ -40,6 +42,9 @@ async function load() {
   profile = sess.profile;
 
   if (services.length) selectedServiceId = services[0].id;
+  if (session && profile?.role === 'customer') {
+    isFav = await isFavorite(session.user.id, shopId);
+  }
 
   render();
 }
@@ -60,8 +65,13 @@ function render() {
     <div class="row g-4">
       <div class="col-lg-8">
         <div class="mb-4">
-          <span class="shop-card-cat">${shop.category}</span>
-          <h1>${shop.name}</h1>
+          <div class="d-flex align-items-start justify-content-between gap-2">
+            <div>
+              <span class="shop-card-cat">${shop.category}</span>
+              <h1 class="mb-0">${shop.name}</h1>
+            </div>
+            ${session && profile?.role === 'customer' ? `<button type="button" class="btn btn-outline-secondary btn-sm fav-btn-detail ${isFav ? 'active' : ''}" id="favToggle"><i class="bi ${isFav ? 'bi-heart-fill' : 'bi-heart'}"></i> ${isFav ? 'บันทึกแล้ว' : 'บันทึกร้านโปรด'}</button>` : ''}
+          </div>
           <div class="shop-info-meta">
             ${avg ? `<span><span class="stars">★</span> <span class="rating-num">${avg.toFixed(1)}</span> (${reviews.length} รีวิว)</span>` : '<span>ยังไม่มีรีวิว</span>'}
             ${shop.address ? `<span><i class="bi bi-geo-alt"></i> ${shop.address}</span>` : ''}
@@ -100,6 +110,20 @@ function render() {
       renderSlots();
       qs('#bookingWidget').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+  });
+
+  qs('#favToggle')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      isFav = await toggleFavorite(session.user.id, shopId, isFav);
+      btn.classList.toggle('active', isFav);
+      btn.innerHTML = `<i class="bi ${isFav ? 'bi-heart-fill' : 'bi-heart'}"></i> ${isFav ? 'บันทึกแล้ว' : 'บันทึกร้านโปรด'}`;
+    } catch (err) {
+      alert('บันทึกร้านโปรดไม่สำเร็จ: ' + err.message);
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   attachBookingHandlers();
@@ -219,18 +243,31 @@ async function renderSlots() {
     .neq('status', 'cancelled');
 
   const taken = new Set((existing || []).map((b) => b.booking_time.slice(0, 5)));
+  const availableCount = slots.filter((t) => !taken.has(t)).length;
+  const isToday = date === new Date().toISOString().slice(0, 10);
 
-  if (!slots.length) {
-    grid.innerHTML = '<span class="form-text">ไม่มีช่วงเวลาว่างสำหรับบริการนี้</span>';
+  if (!slots.length || availableCount === 0) {
+    grid.innerHTML = `
+      <span class="form-text d-block mb-2">${!slots.length ? 'ไม่มีช่วงเวลาว่างสำหรับบริการนี้' : 'คิววันนี้เต็มหมดแล้ว'}</span>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="joinWaitlistBtn"><i class="bi bi-bell"></i> แจ้งเตือนถ้ามีคิวว่าง</button>
+    `;
+    qs('#joinWaitlistBtn')?.addEventListener('click', joinWaitlist);
     return;
   }
 
-  grid.innerHTML = slots
-    .map(
-      (t) =>
-        `<button type="button" class="slot-btn ${t === selectedTime ? 'selected' : ''}" data-time="${t}" ${taken.has(t) ? 'disabled' : ''}>${t}</button>`
-    )
-    .join('');
+  const urgencyHtml =
+    isToday && availableCount <= 5
+      ? `<div class="urgency-inline mb-2"><i class="bi bi-fire"></i> เหลือคิวว่างวันนี้ ${availableCount} คิว</div>`
+      : '';
+
+  grid.innerHTML =
+    urgencyHtml +
+    slots
+      .map(
+        (t) =>
+          `<button type="button" class="slot-btn ${t === selectedTime ? 'selected' : ''}" data-time="${t}" ${taken.has(t) ? 'disabled' : ''}>${t}</button>`
+      )
+      .join('');
 
   grid.querySelectorAll('.slot-btn:not(:disabled)').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -242,6 +279,30 @@ async function renderSlots() {
       submitBtn.textContent = `จองเวลา ${selectedTime} น.`;
     });
   });
+}
+
+async function joinWaitlist() {
+  const btn = qs('#joinWaitlistBtn');
+  const date = qs('#bookingDate').value;
+  btn.disabled = true;
+  btn.textContent = 'กำลังลงชื่อ...';
+
+  const { error } = await supabase.from('waitlist').insert({
+    shop_id: shopId,
+    service_id: selectedServiceId,
+    customer_id: session.user.id,
+    preferred_date: date,
+  });
+
+  if (error) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-bell"></i> แจ้งเตือนถ้ามีคิวว่าง';
+    qs('#bookingMsg').innerHTML = `<div class="alert alert-danger">ลงชื่อรอคิวไม่สำเร็จ: ${error.message}</div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-check2"></i> ลงชื่อรอคิวแล้ว จะแจ้งเตือนเมื่อมีที่ว่าง';
 }
 
 async function submitBooking() {

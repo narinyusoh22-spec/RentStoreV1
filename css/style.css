@@ -434,6 +434,38 @@ a, button, .btn, .chip, .shop-card, .ticket, .stat-card, .service-item,
   position: absolute; inset: 0;
   background: linear-gradient(180deg, transparent 60%, rgba(22,55,49,0.18) 100%);
 }
+.fav-btn {
+  position: absolute;
+  top: 10px; right: 10px;
+  z-index: 2;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s var(--ease-spring), color 0.2s ease, background 0.2s ease;
+}
+.fav-btn:hover { transform: scale(1.12); }
+.fav-btn.active { color: var(--bs-danger); }
+.fav-btn.active i { animation: popIn 0.3s var(--ease-spring) both; }
+.urgency-badge {
+  position: absolute;
+  bottom: 10px; left: 10px;
+  z-index: 2;
+  background: rgba(193, 68, 45, 0.9);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
 .shop-card-body { padding: 16px 18px 18px; }
 .shop-card-cat {
   font-size: 0.72rem;
@@ -620,6 +652,18 @@ a, button, .btn, .chip, .shop-card, .ticket, .stat-card, .service-item,
   background: var(--bs-warning);
 }
 .notif-time { font-size: 0.75rem; color: var(--ink-faint); margin-top: 4px; }
+
+.fav-btn-detail.active { color: var(--bs-danger); border-color: var(--bs-danger); }
+.fav-btn-detail.active i { animation: popIn 0.3s var(--ease-spring) both; }
+.urgency-inline {
+  background: rgba(193, 68, 45, 0.1);
+  color: var(--bs-danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--bs-border-radius-sm);
+  grid-column: 1 / -1;
+}
 
 /* ---------- Reviews ---------- */
 .review-card {
