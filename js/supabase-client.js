@@ -5,13 +5,35 @@
 // =========================================================
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const SUPABASE_URL = 'https://sqvedwociszpewbqwzce.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNxdmVkd29jaXN6cGV3YnF3emNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NDc5NjcsImV4cCI6MjA5OTMyMzk2N30.kLjrHbd27luXGpce49cwMEf1uJKhgjOnRb-yErUbPDM';
+const SUPABASE_URL = 'https://YOUR-PROJECT-REF.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR-ANON-PUBLIC-KEY';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ---------- site-wide animated liquid background ----------
+// purely decorative morphing blobs, injected once per page load so we don't
+// need to add markup to every HTML file. Styling + keyframes live in
+// css/style.css under "Liquid animated background".
+(function injectLiquidBackground() {
+  if (document.querySelector('.liquid-bg')) return;
+  const bg = document.createElement('div');
+  bg.className = 'liquid-bg';
+  bg.setAttribute('aria-hidden', 'true');
+  bg.innerHTML =
+    '<span class="liquid-blob blob-a"></span>' +
+    '<span class="liquid-blob blob-b"></span>' +
+    '<span class="liquid-blob blob-c"></span>';
+  document.body.prepend(bg);
+})();
+
 // bucket name used for shop / service images (create this in Storage)
 export const MEDIA_BUCKET = 'shop-media';
+
+// client-side guardrails — the Supabase Storage bucket itself should also be
+// configured with matching limits (see sql/schema.sql) since client checks
+// alone can be bypassed
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 // ---------- small shared helpers used across pages ----------
 
@@ -54,6 +76,12 @@ export function starString(rating) {
 }
 
 export async function uploadImage(file, pathPrefix) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error('รองรับเฉพาะไฟล์รูปภาพชนิด JPG, PNG, WEBP หรือ GIF เท่านั้น');
+  }
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    throw new Error('ขนาดไฟล์ต้องไม่เกิน 5MB กรุณาเลือกรูปที่มีขนาดเล็กลง');
+  }
   const ext = file.name.split('.').pop();
   const path = `${pathPrefix}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, file, { upsert: true });
