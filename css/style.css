@@ -397,6 +397,20 @@ a, button, .btn, .chip, .shop-card, .ticket, .stat-card, .service-item,
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
+
+/* nav-pills (used for login/register tabs and dashboard tabs) get a livelier
+   active state matching the brand theme instead of Bootstrap's default blue */
+.nav-pills .nav-link {
+  color: var(--ink-soft);
+  font-weight: 600;
+  border-radius: 999px;
+  position: relative;
+}
+.nav-pills .nav-link:hover:not(.active) { background: var(--surface-2); color: var(--primary-dark); }
+.nav-pills .nav-link.active {
+  background: var(--gradient-primary) !important;
+  box-shadow: 0 4px 14px rgba(31, 75, 67, 0.25);
+}
 .theme-toggle i { display: inline-block; transition: transform 0.4s var(--ease-spring); }
 .theme-toggle:active i { transform: rotate(25deg) scale(0.85); }
 @keyframes iconSpin {
