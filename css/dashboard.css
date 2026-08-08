@@ -55,19 +55,6 @@
 }
 .ticket-qr img { border-radius: 6px; background: #fff; padding: 4px; }
 
-/* nav-pills get a livelier active state to match the rest of the theme */
-.nav-pills .nav-link {
-  color: var(--ink-soft);
-  font-weight: 600;
-  border-radius: 999px;
-  position: relative;
-}
-.nav-pills .nav-link:hover:not(.active) { background: var(--surface-2); color: var(--primary-dark); }
-.nav-pills .nav-link.active {
-  background: var(--gradient-primary) !important;
-  box-shadow: 0 4px 14px rgba(31, 75, 67, 0.25);
-}
-
 /* stat cards */
 .stat-card {
   background: #fff;
